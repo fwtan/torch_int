@@ -3,7 +3,8 @@ from .._CUDA import (linear_a8_w8_b32_o32,
                      linear_relu_a8_w8_b8_o8,
                      linear_a8_w8_b8_o8,
                      linear_a8_w8_b32_o32_with_scaling,
-                     linear_a8_w8_bfp32_ofp32
+                     linear_a8_w8_bfp32_ofp32,
+                     linear_a8_w8_b16_o16
                      )
 from ..functional.quantization import (
     quantize_per_tensor_absmax,
@@ -352,3 +353,52 @@ class W8FakeA8Linear(torch.nn.Module):
 
     def __repr__(self):
         return super().__repr__() + f'({self.in_features}, {self.out_features}, bias={self.bias is not None})'
+
+
+class W8A8B16O16Linear(torch.nn.Module):
+    def __init__(self, in_features, out_features, bias=True, alpha=1.0, beta=1.0):
+        super().__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.register_buffer('weight', torch.randint(-127, 127, (self.out_features, self.in_features), dtype=torch.int8, requires_grad=False))
+        self.register_buffer('bias', torch.zeros((1, self.out_features), dtype=torch.int16, requires_grad=False))
+        self.register_buffer('a', torch.tensor(alpha))
+        self.register_buffer('b', torch.tensor(beta))
+        self.use_bias = bias
+
+    def to(self, *args, **kwargs):
+        super().to(*args, **kwargs)
+        self.weight = self.weight.to(*args, **kwargs)
+        self.bias = self.bias.to(*args, **kwargs)
+        return self
+
+    @torch.no_grad()
+    def forward(self, x):
+        x_shape = x.shape
+        x = x.view(-1, x_shape[-1])
+        y = linear_a8_w8_b16_o16(x, self.weight, self.bias, self.a.item(), self.b.item())
+        y = y.view(*x_shape[:-1], -1)
+        return y
+
+    @staticmethod
+    def from_float(module: torch.nn.Linear, input_scale, output_scale):
+        int8_module = W8A8B16O16Linear(module.in_features, module.out_features, module.bias is not None)
+        int8_weight, weight_scale = quantize_per_tensor_absmax(module.weight)
+        if module.bias is not None:
+            module.bias = module.bias.float()
+            bias_scale = module.bias.abs().max() / torch.iinfo(torch.int16).max
+            int16_bias = (module.bias / bias_scale).round().to(torch.int16)
+        else:
+            bias_scale = torch.tensor(0.0).to(int8_module.b.device)
+            int16_bias = int8_module.bias
+        alpha = input_scale * weight_scale / output_scale
+        beta = bias_scale / output_scale
+        int8_module.weight = int8_weight
+        int8_module.bias = int16_bias
+        int8_module.a = alpha
+        int8_module.b = beta
+        int8_module.input_scale = input_scale
+        int8_module.output_scale = output_scale
+        int8_module.weight_scale = weight_scale
+        int8_module.bias_scale = bias_scale
+        return int8_module

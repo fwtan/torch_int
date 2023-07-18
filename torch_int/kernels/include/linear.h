@@ -40,4 +40,12 @@ torch::Tensor linear_a8_w8_b8_o8(torch::Tensor input,  // INT8
                                  float beta            // FP32
 );
 
+torch::Tensor linear_a8_w8_b16_o16(
+                                torch::Tensor input,     // INT8
+                                torch::Tensor weight,    // INT8
+                                torch::Tensor bias,      // INT16
+                                float alpha,             // FP32
+                                float beta               // FP32
+);
+
 #endif // LINEAR_HS

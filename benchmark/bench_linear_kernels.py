@@ -1,5 +1,5 @@
 import torch
-from torch_int._CUDA import linear_a8_w8_b32_o32, linear_relu_a8_w8_b8_o8, linear_a8_w8_b8_o8
+from torch_int._CUDA import linear_a8_w8_b32_o32, linear_relu_a8_w8_b8_o8, linear_a8_w8_b8_o8, linear_a8_w8_b16_o16
 from utils import bench_func_latency
 import argparse
 
@@ -61,6 +61,24 @@ def bench_linear_relu_a8_w8_b8_o8(precision, seq_len, c1, c2):
     bench_func_latency(fn, args, num_iter=2000)
 
 
+def bench_linear_a8_w8_b16_o16(precision, seq_len, c1, c2):
+    if precision == 'int8':
+        dummy_input = torch.randint(-127, 127,
+                                    (seq_len, c1), dtype=torch.int8).cuda()
+        weight = torch.randint(-127, 127, (c2, c1), dtype=torch.int8).cuda()
+        bias = torch.randint(-30000, 30000, (c2,), dtype=torch.int16).cuda()
+        args = (dummy_input, weight, bias, 0.001, 0.01)
+        fn = linear_a8_w8_b16_o16
+    elif precision == 'fp16':
+        dummy_input = torch.randn(seq_len, c1).half().cuda()
+        model = torch.nn.Linear(c1, c2).half().cuda()
+        args = (dummy_input,)
+        fn = model.forward
+    else:
+        raise NotImplementedError
+    bench_func_latency(fn, args, num_iter=2000)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--seq-len', type=int, default=512)
@@ -82,5 +100,7 @@ if __name__ == '__main__':
         bench_linear_a8_w8_b8_o8(args.precision, SEQ_LEN, C1, C2)
     elif args.func == 'linear_relu_a8_w8_b8_o8':
         bench_linear_relu_a8_w8_b8_o8(args.precision, SEQ_LEN, C1, C2)
+    elif args.func == 'linear_a8_w8_b16_o16':
+        bench_linear_a8_w8_b16_o16(args.precision, SEQ_LEN, C1, C2)
     else:
         raise NotImplementedError
