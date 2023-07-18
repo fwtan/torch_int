@@ -13,4 +13,12 @@ dq_add_layernorm_q(torch::Tensor input,          // INT32
                    float epsilon                 // FP
 ); // The output scale has already been fused into gamma and beta
 
+std::tuple<torch::Tensor, torch::Tensor> // (residual_output (FP), rn_output (INT8))
+dq_add_rmsnorm_q(torch::Tensor input,          // INT32
+                 float input_scale,            // FP
+                 torch::Tensor residual_input, // FP
+                 torch::Tensor gamma,          // FP
+                 float epsilon                 // FP
+); // The output scale has already been fused into gamma
+
 #endif // FUSED_H
