@@ -13,8 +13,8 @@ def test_quant_linear_a8_w8_b32_o32():
     linear = torch.nn.Linear(M, N, bias=True)
     linear.weight.data = weight.float()
     linear.bias.data = bias.float()
-    y_gt = linear(x.float()).to(torch.int32)
-    y = linear_a8_w8_b32_o32(x.cuda(), weight.cuda(), bias.cuda()).to(torch.int32)
+    y_gt = linear(x.float()).round().to(torch.int32)
+    y = linear_a8_w8_b32_o32(x.cuda(), weight.cuda(), bias.cuda())
     ic(torch.allclose(y_gt, y.cpu(), atol=1e-3))
 
 

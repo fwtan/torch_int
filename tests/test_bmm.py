@@ -1,5 +1,5 @@
 import torch
-from torch_int._CUDA import bmm_s8t_s8n_s8t, bmm_s8t_s8n_s32t, bmm_s8t_s8n_f32t
+from torch_int._CUDA import bmm_s8t_s8n_s8t, bmm_s8t_s8n_s32t, bmm_s8t_s8n_f32t, bmm_s8t_s8n_s16t, bmm_s8t_s8n_s32t_with_scaling
 from icecream import ic
 
 
@@ -120,6 +120,35 @@ def test_bmm_s8t_s8n_s32t():
     ic(torch.allclose(c_gt, c.cpu()))
 
 
+# (A_row V_row)_row ^ T = (V_row ^T A_row ^T)_row = (V^T_row A_col)_row
+# (A_row V_row)_row = (A_row V_col ^T)_row
+@torch.no_grad()
+def test_bmm_s8t_s8n_s32t_with_scaling():
+    # used by query x key
+    B, M, K, N = 1, 512, 512, 32
+    a = torch.randint(-128, 127, (B, M, K), dtype=torch.int8)
+    b = torch.randint(-128, 127, (B, N, K), dtype=torch.int8)
+    scale = 0.001
+    c_gt = torch.bmm(a.float(), b.float().transpose(1, 2)) * scale
+    c_gt = c_gt.clamp(torch.iinfo(torch.int32).min, torch.iinfo(torch.int32).max).round().to(torch.int32)
+    c = bmm_s8t_s8n_s32t_with_scaling(a.cuda(), b.cuda(), scale)
+    ic(torch.allclose(c_gt, c.cpu(), atol=0.1))
+
+
+# (A_row V_row)_row ^ T = (V_row ^T A_row ^T)_row = (V^T_row A_col)_row
+# (A_row V_row)_row = (A_row V_col ^T)_row
+@torch.no_grad()
+def test_bmm_s8t_s8n_s16t():
+    B, M, K, N = 1, 512, 512, 32
+    a = torch.randint(-128, 127, (B, M, K), dtype=torch.int8)
+    b = torch.randint(-128, 127, (B, N, K), dtype=torch.int8)
+    scale = 0.001
+    c = bmm_s8t_s8n_s16t(a.cuda(), b.cuda(), scale)
+    c_gt = torch.bmm(a.float(), b.float().transpose(1, 2)) * scale
+    c_gt = c_gt.clamp(torch.iinfo(torch.int16).min, torch.iinfo(torch.int16).max).round().to(torch.int16)
+    ic(torch.allclose(c_gt, c.cpu()))
+
+
 if __name__ == '__main__':
     print('test_bmm_s8t_s8n_s8t')
     test_bmm_s8t_s8n_s8t()
@@ -129,3 +158,7 @@ if __name__ == '__main__':
     test_bmm_s8t_s8n_s32t()
     print('test_bmm_s8t_s8n_f32t')
     test_bmm_s8t_s8n_f32t()
+    print('test_bmm_s8t_s8n_s32t_with_scaling')
+    test_bmm_s8t_s8n_s32t_with_scaling()
+    print('test_bmm_s8t_s8n_s16t')
+    test_bmm_s8t_s8n_s16t()

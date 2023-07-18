@@ -20,4 +20,6 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("bmm_s8t_s8n_f32t", &bmm_s8t_s8n_f32t, "BMM (INT8 I FP32 O) A x B.T");
   m.def("bmm_s8t_s8n_s32t", &bmm_s8t_s8n_s32t,
         "BMM (INT8 In Int32 Out) A x B.T");
+  m.def("bmm_s8t_s8n_s32t_with_scaling", &bmm_s8t_s8n_s32t_with_scaling, "BMM (INT8 In Int32 Out) A x B.T");
+  m.def("bmm_s8t_s8n_s16t", &bmm_s8t_s8n_s16t, "BMM (INT8 In Int16 Out) A x B.T");
 }

@@ -20,7 +20,7 @@ torch::Tensor linear_a8_w8_b32_o32(torch::Tensor input,  // INT8
 
   using ElementOutput = int32_t;
   using ElementAccumulator = int32_t;
-  using ElementComputeEpilogue = int32_t;
+  using ElementComputeEpilogue = float;
   using ElementInputA = int8_t; // <- data type of elements in input matrix A
   using ElementInputB = int8_t; // <- data type of elements in input matrix B
 
