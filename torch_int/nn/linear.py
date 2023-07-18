@@ -15,7 +15,7 @@ from ..functional.quantization import (
 
 class W8A8B8O8Linear(torch.nn.Module):
     # For qkv_proj
-    def __init__(self, in_features, out_features, alpha=1.0, beta=1.0):
+    def __init__(self, in_features, out_features, bias=True, alpha=1.0, beta=1.0):
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
@@ -26,6 +26,7 @@ class W8A8B8O8Linear(torch.nn.Module):
             (1, self.out_features), dtype=torch.int8, requires_grad=False))
         self.register_buffer('a', torch.tensor(alpha))
         self.register_buffer('b', torch.tensor(beta))
+        self.use_bias = bias
 
     def to(self, *args, **kwargs):
         super().to(*args, **kwargs)
@@ -45,9 +46,14 @@ class W8A8B8O8Linear(torch.nn.Module):
     @staticmethod
     def from_float(module: torch.nn.Linear, input_scale, output_scale):
         int8_module = W8A8B8O8Linear(
-            module.in_features, module.out_features)
+            module.in_features, module.out_features, 
+            module.bias is not None,
+        )
         int8_weight, weight_scale = quantize_per_tensor_absmax(module.weight)
-        int8_bias, bias_scale = quantize_per_tensor_absmax(module.bias)
+        if int8_module.use_bias:
+            int8_bias, bias_scale = quantize_per_tensor_absmax(module.bias)
+        else:
+            int8_bias, bias_scale = int8_module.bias, torch.tensor(0.0).to(int8_module.b.device)
         alpha = input_scale * weight_scale / output_scale
         beta = bias_scale / output_scale
         int8_module.weight = int8_weight
@@ -131,7 +137,7 @@ class W8A8B32O32LinearWithoutScaling(torch.nn.Module):
 
 class W8A8B32O32Linear(torch.nn.Module):
     # For fc2 and out_proj
-    def __init__(self, in_features, out_features, alpha=1.0, beta=1.0):
+    def __init__(self, in_features, out_features, bias=True, alpha=1.0, beta=1.0):
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
@@ -142,6 +148,7 @@ class W8A8B32O32Linear(torch.nn.Module):
             (1, self.out_features), dtype=torch.int32, requires_grad=False))
         self.register_buffer('a', torch.tensor(alpha))
         self.register_buffer('b', torch.tensor(beta))
+        self.use_bias = bias
 
     def to(self, *args, **kwargs):
         super().to(*args, **kwargs)
@@ -161,11 +168,17 @@ class W8A8B32O32Linear(torch.nn.Module):
     @staticmethod
     def from_float(module: torch.nn.Linear, input_scale, output_scale):
         int8_module = W8A8B32O32Linear(
-            module.in_features, module.out_features)
+            module.in_features, module.out_features,
+            module.bias is not None,
+        )
         int8_weight, weight_scale = quantize_per_tensor_absmax(module.weight)
-        module.bias = module.bias.float()
-        bias_scale = module.bias.abs().max() / (2**31 - 1)
-        int32_bias = (module.bias / bias_scale).round().to(torch.int32)
+        if int8_module.use_bias:
+            module.bias = module.bias.float()
+            bias_scale = module.bias.abs().max() / (2**31 - 1)
+            int32_bias = (module.bias / bias_scale).round().to(torch.int32)
+        else:
+            bias_scale = torch.tensor(0.0).to(int8_module.b.device)
+            int32_bias = int8_module.bias
         alpha = input_scale * weight_scale / output_scale
         beta = bias_scale / output_scale
         int8_module.weight = int8_weight
@@ -181,7 +194,7 @@ class W8A8B32O32Linear(torch.nn.Module):
 
 class W8A8BFP32OFP32Linear(torch.nn.Module):
     # For fc2 and out_proj
-    def __init__(self, in_features, out_features, alpha=1.0, beta=1.0):
+    def __init__(self, in_features, out_features, bias=True, alpha=1.0, beta=1.0):
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
@@ -191,6 +204,7 @@ class W8A8BFP32OFP32Linear(torch.nn.Module):
         self.register_buffer('bias', torch.zeros(
             (1, self.out_features), dtype=torch.float32, requires_grad=False))
         self.register_buffer('a', torch.tensor(alpha))
+        self.use_bias = bias
 
     def _apply(self, fn):
         # prevent the bias from being converted to half
@@ -218,11 +232,14 @@ class W8A8BFP32OFP32Linear(torch.nn.Module):
     @staticmethod
     def from_float(module: torch.nn.Linear, input_scale):
         int8_module = W8A8BFP32OFP32Linear(
-            module.in_features, module.out_features)
+            module.in_features, module.out_features,
+            module.bias is not None,
+        )
         int8_weight, weight_scale = quantize_per_tensor_absmax(module.weight)
         alpha = input_scale * weight_scale
         int8_module.weight = int8_weight
-        int8_module.bias = module.bias.to(torch.float32)
+        if int8_module.use_bias:
+            int8_module.bias = module.bias.to(torch.float32)
         int8_module.a = alpha
         int8_module.input_scale = input_scale
         int8_module.weight_scale = weight_scale
