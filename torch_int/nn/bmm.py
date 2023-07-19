@@ -12,7 +12,7 @@ class BMM_S8T_S8N_S8T(torch.nn.Module):
         # a: [B, M, K] int8
         # b: [B, N, K] int8
         # return: [B, M, N] int8
-        return bmm_s8t_s8n_s8t(a, b, self.a.item())
+        return bmm_s8t_s8n_s8t(a.contiguous(), b.contiguous(), self.a.item())
 
     @staticmethod
     def from_scale(a_scale, b_scale, output_scale):
@@ -34,7 +34,7 @@ class BMM_S8T_S8N_F32T(torch.nn.Module):
         # a: [B, M, K] int8
         # b: [B, N, K] int8
         # return: [B, M, N] int32
-        return bmm_s8t_s8n_f32t(a, b, self.a.item())
+        return bmm_s8t_s8n_f32t(a.contiguous(), b.contiguous(), self.a.item())
 
     @staticmethod
     def from_scale(a_scale, b_scale):
@@ -55,7 +55,7 @@ class BMM_S8T_S8N_S32T(torch.nn.Module):
         # a: [B, M, K] int8
         # b: [B, N, K] int8
         # return: [B, M, N] int32
-        return bmm_s8t_s8n_s32t(a, b)
+        return bmm_s8t_s8n_s32t(a.contiguous(), b.contiguous())
 
 
 class BMM_S8T_S8N_S16T(torch.nn.Module):
@@ -68,7 +68,7 @@ class BMM_S8T_S8N_S16T(torch.nn.Module):
         # a: [B, M, K] int8
         # b: [B, N, K] int8
         # return: [B, M, N] int16
-        return bmm_s8t_s8n_s16t(a, b, self.a.item())
+        return bmm_s8t_s8n_s16t(a.contiguous(), b.contiguous(), self.a.item())
 
     @staticmethod
     def from_scale(a_scale, b_scale, output_scale):
@@ -90,7 +90,7 @@ class BMM_S8T_S8N_S32T_WITH_SCALING(torch.nn.Module):
         # a: [B, M, K] int8
         # b: [B, N, K] int8
         # return: [B, M, N] int32
-        return bmm_s8t_s8n_s32t_with_scaling(a, b, self.a.item())
+        return bmm_s8t_s8n_s32t_with_scaling(a.contiguous(), b.contiguous(), self.a.item())
 
     @staticmethod
     def from_scale(a_scale, b_scale, output_scale):
